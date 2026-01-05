@@ -12,6 +12,7 @@ jobs:
       - name: Extract CVE ID from issue
         id: extract
         run: |
+          # Extract CVE ID from issue title
           CVE_ID=$(echo "${{ github.event.issue.title }}" | grep -oE 'CVE-[0-9]{4}-[0-9]+' || true)
 
           if [ -z "$CVE_ID" ]; then
@@ -20,10 +21,12 @@ jobs:
           fi
 
           echo "cve_id=$CVE_ID" >> $GITHUB_OUTPUT
+          echo "Extracted CVE ID: $CVE_ID"
 
       - name: Send issue to backend
         run: |
-          curl -s -o response.txt -w "%{http_code}" \
+          # Send POST request to backend and capture body + HTTP status
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST http://20.3.140.91/api/cves \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
@@ -31,16 +34,19 @@ jobs:
               "orgId": "${{ vars.ORG_ID }}",
               "cveId": "${{ steps.extract.outputs.cve_id }}",
               "issue": ${{ github.event.issue.number }}
-            }'
+            }')
 
-      - name: Validate backend response
-        run: |
-          STATUS=$(tail -n 1 response.txt)
-          BODY=$(head -n -1 response.txt)
+          # Split response body and status code
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          STATUS=$(echo "$RESPONSE" | tail -n 1)
 
-          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
-            echo "Backend error ($STATUS)"
-            echo "$BODY"
+          echo "HTTP Status: $STATUS"
+          echo "Response Body:"
+          echo "$BODY"
+
+          # Fail workflow on non-2xx responses
+          if ! [[ "$STATUS" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Backend returned an error ($STATUS)"
             exit 1
           fi
 
