@@ -30,7 +30,7 @@ jobs:
             -d '{
               "orgId": "${{ vars.ORG_ID }}",
               "cveId": "${{ steps.extract.outputs.cve_id }}",
-              "issue": "${{ github.event.issue.number }}"
+              "issue": ${{ github.event.issue.number }}
             }'
 
       - name: Validate backend response
